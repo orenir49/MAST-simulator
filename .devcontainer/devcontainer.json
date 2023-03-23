@@ -1,0 +1,7 @@
+{
+    "name": "python",
+
+    "dockerFile": "./Dockerfile",
+
+    "extensions": ["ms-python.python", "ms-toolsai.jupyter"]
+}
