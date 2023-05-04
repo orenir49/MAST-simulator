@@ -1,10 +1,11 @@
-The relevant files/folders for simulating MAST images, SNR and spot sizes:
+Can download 'simulate.zip' and run the program without any prerequisites, on a Windows PC.
+Further instructions in 'MAST simulator manual' file.
+
+With Python, can also run the simulation with a Python notebook. Download to your workspace:
 * simulate.ipynb (python notebook)
 * essential_files (folder)
-
-Download the repo as ZIP and upload the notebook and folder to your workspace.
-There are instructions at the top of the notebook:
-1. Install packages with 'essential_files/requirements.txt'
+Simple instructions at the top of the notebook:
+1. Verify dependencies with 'essential_files/requirements.txt'
 2. Run all cells.
 3. Scroll down, input parameters of your choice.
 4. Click 'Simulate Image'.
