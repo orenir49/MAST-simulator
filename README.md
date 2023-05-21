@@ -1,5 +1,5 @@
-Can download 'simulate.zip' and run the program without any prerequisites, on a Windows PC.
-Further instructions in 'MAST simulator manual' file.
+Can run the program without any prerequisites, on a Windows PC-
+please contact me to get the file/user manual.
 
 With Python, can also run the simulation with a Python notebook. Download to your workspace:
 * simulate.ipynb (python notebook)
