@@ -45,15 +45,15 @@ filters = pd.DataFrame(data=d_filters)
 
 # MAST CCD constants
 # Pixels in the CCD
-ccd_width_px = 4656
-ccd_height_px = 3520
+ccd_width_px = 5496
+ccd_height_px = 3672
 
 # Buffer of pixels when querying data and performing the convolution
 ccd_width_buff_px = 512
 ccd_height_buff_px = 512
 
 # The lenght of each pixel in the CCD
-ccd_px_side_length_micron = 3.8 * u.micron
+ccd_px_side_length_micron = 2.4 * u.micron
 ccd_width_micron = ccd_width_px * ccd_px_side_length_micron
 ccd_height_micron = ccd_height_px * ccd_px_side_length_micron
 ccd_width_buff_micron = ccd_width_buff_px * ccd_px_side_length_micron
@@ -84,15 +84,15 @@ ccd_width_buff_range_deg = ccd_width_buff_range_arcsec.to(u.deg)
 ccd_height_buff_range_deg = ccd_height_buff_range_arcsec.to(u.deg)
 
 # Saturation of the CCD per pixel
-ccd_full_well = 20000 * u.electron
+ccd_full_well = 15000 * u.electron
 
 # Arbitrary count added to each pixel before printing image
 baseline_per_px = 20 * u.electron 
 
 # Focal points (middle of field) projection on CCD "width" axis, for different modes of operation
 feed_middle_width = int(ccd_width_px/2 - 1)
-wide_middle_width = 3873
-narrow_middle_width = 631
+wide_middle_width = 4300
+narrow_middle_width = 803
 
 # Gaia constants
 gaia_collecting_area_m2 = 0.7 * u.m**2
@@ -103,7 +103,7 @@ mag_ZP = 9.953577 # magnitude of arbitrary star I picked from the simulation
 flux_ZP = 230465 # flux detected with MAST, calculated using the spectrum
 
 # PSF properties
-r_lst = [0,267,535,803,1070,1338,1606,1874,2141,2409,2677,2945,3212,3480,3748,4016,4283]
+r_lst = [0, 423, 847, 1271, 1695, 2119, 2543, 2967, 3391, 3815, 4239, 4663, 5087, 5511, 5935, 6358, 6782]
 ang0 = 90
 
 # General function to query from Gaia using ADQL

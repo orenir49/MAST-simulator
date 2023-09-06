@@ -3,3 +3,5 @@ MAST_VENV
 PlateSolve3
 images
 ps_results
+new_psfs
+__pycache__
