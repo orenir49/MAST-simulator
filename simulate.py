@@ -23,6 +23,7 @@ from PIL import Image
 
 # Manipulating & parsing files
 import os
+import shutil
 
 # Parallel computation
 from multiprocessing import Pool
@@ -270,7 +271,30 @@ def interp_kernel(ker,resolution):
     ker = ker/np.sum(ker)
     return ker
 
-# In[14]:
+# In[14]
+
+## create coma kernels convolved with seeing, at the specified resolution
+## return the path to the temporary directory where the kernels are saved
+
+def create_kernels(resolution,seeing):
+    dirpath = os.path.join('.','essential_files','kernels_u')
+    tmpdirpath = os.path.join('.','essential_files','kernels_tmp')
+    os.mkdir(tmpdirpath)
+    filenames = next(os.walk(dirpath), (None, None, []))[2]
+    for f in filenames: # go through all the coma kernels
+        kerpath = os.path.join(dirpath,f)    
+        ker = np.load(kerpath)
+        if resolution > 1: # if the resolution is higher than 1, interpolate the kernel to the higher resolution
+            ker = interp_kernel(ker,resolution)
+        seeing_px = seeing / (plate_scale_arcsec_px) * resolution
+        sigma = seeing_px/2.355 # fhwm = 2*sqrt(2*ln(2))*sigma
+        ker2 = convolution.Gaussian2DKernel(x_stddev = sigma , y_stddev = sigma)
+        ker = np.pad(ker,int(ker2.shape[0]/2))
+        ker = convolution.convolve(ker,ker2,normalize_kernel=True) # convolve coma with seeing to create the final kernel
+        np.save(os.path.join(tmpdirpath,f),ker) # save the kernel
+    return tmpdirpath
+
+# In[15]:
 
 # This function is auxiliary to 'psf_rms'
 # finds the center (first moment) of a kernel
@@ -283,7 +307,7 @@ def psf_center(ker):
             numerator_w += ker[h,w] * w
             numerator_h += ker[h,w] * h
     return numerator_h/denominator , numerator_w/denominator
-# In[15]:
+# In[16]:
 
 # This function finds the RMS width of a PSF (centralized second moment)
 # This is an okay approximation to what Zemax gives 
@@ -296,7 +320,7 @@ def psf_rms(ker):
         for w in range(ker.shape[1]):
             numerator += ker[h,w] * ((h-center_h)**2 + (w-center_w)**2)
     return np.sqrt(numerator/denominator)
-# In[16]:
+# In[17]:
 
 # aligns an image by angle 'ang' from the x-axis, counter-clockwise 
 # used to rotate the kernels, which are generated with an initial orientation 'ang0'
@@ -306,11 +330,13 @@ def rot(psf,ang,ang0):
     im = np.array(im)
     im = im/np.sum(im)
     return im
-# In[17]:
+# In[18]:
 
 # for a source located at column w (px), and row h (px)
 # adds the PSF of the source (Coma from mirror + Gaussian from seeing)
-def add_PSF(image, w, h, seeing_arcsec, op_mode, resolution): 
+def add_PSF(image, w, h, seeing_arcsec, op_mode, resolution, kernel_dir): 
+    
+    # the center of the FoV is not necessarily in the center of the image
     if(op_mode == 'Feed'):   
         wc = int(ccd_width_buff_px/2) + feed_middle_width
     elif(op_mode == 'Shifted_wide'):
@@ -319,35 +345,28 @@ def add_PSF(image, w, h, seeing_arcsec, op_mode, resolution):
         wc = int(ccd_width_buff_px/2) + narrow_middle_width
     hc = int(ccd_height_buff_px/2) + int(ccd_height_px/2) - 1
         
-    wc *= resolution
+    wc *= resolution 
     hc *= resolution 
 
-    dis_from_center = np.sqrt((w-wc)**2 + (h-hc)**2) / resolution
-    ang = np.rad2deg(np.arctan2(h-hc,w-wc))
+    dis_from_center = np.sqrt((w-wc)**2 + (h-hc)**2) / resolution # distance from center in px- used to choose the right kernel
+    ang = np.rad2deg(np.arctan2(h-hc,w-wc)) # angle from center in degrees- used to rotate the kernel
     r_ker = r_lst[np.argmin(np.abs(r_lst - dis_from_center))]
-    ker_name = os.path.join('.','essential_files','kernels_u', str.format(r'r={}.npy',r_ker))
-    ker = np.load(ker_name)
+    ker_name = os.path.join(kernel_dir, str.format(r'r={}.npy',r_ker)) 
+    ker = np.load(ker_name) # load the appropriate kernel
     ker = rot(ker,ang,ang0)
-    if resolution > 1:
-        ker = interp_kernel(ker,resolution)
-    amplitude = image[h,w]
-    image[h,w] = 0
-    patch = amplitude * ker
-
-    seeing_px = seeing_arcsec / (plate_scale_arcsec_px) * resolution
-    sigma = seeing_px/2.355 # fhwm = 2*sqrt(2*ln(2))*sigma
-    ker2 = convolution.Gaussian2DKernel(x_stddev = sigma , y_stddev = sigma)
-    patch = np.pad(patch,int(ker2.shape[0]/2))
-    patch = convolution.convolve(patch,ker2,normalize_kernel=True)
+    
+    amplitude = image[h,w] # the flux of the source is saved in the image
+    image[h,w] = 0 
+    patch = amplitude * ker # multiply the normalized kernel by the total flux of the source
 
     w_start = w - int(patch.shape[1]/2)
     h_start = h - int(patch.shape[0]/2)
     w_finish = w_start + patch.shape[1]
     h_finish = h_start + patch.shape[0]
-    image[h_start:h_finish,w_start:w_finish] += patch
+    image[h_start:h_finish,w_start:w_finish] += patch # add the PSF to the image
     return image
 
-# In[18]:
+# In[19]:
 
 # Add the sources to the base image
 # image - Matrix for the image
@@ -355,21 +374,21 @@ def add_PSF(image, w, h, seeing_arcsec, op_mode, resolution):
 # wcs_dict - astropy.wcs object to convert from coordinates to pixels
 # t_exp - Image exposure time
 
-def add_sources(image, table, wcs_dict, t_exp, seeing_arcsec, op_mode, resolution):
-    pixs = wcs_dict.wcs_world2pix(table['ra'].data, table['dec'].data, 0)
-    flux = np.round(table['phot_G_flux_mast'].data)
-    brightness = np.random.poisson(lam = flux) * t_exp / u.s 
+def add_sources(image, table, wcs_dict, t_exp, seeing_arcsec, op_mode, resolution, kernel_dir):
+    pixs = wcs_dict.wcs_world2pix(table['ra'].data, table['dec'].data, 0) # convert from sky coordinates to pixels
+    flux = np.round(table['phot_G_flux_mast'].data) # flux in electrons
+    brightness = np.random.poisson(lam = flux) * t_exp / u.s # randomly assign brightness from Poisson distribution 
     for i in range(len(pixs[0])):
-        lst = to_px(pixs[0][i],pixs[1][i],image.shape[1],image.shape[0])
+        lst = to_px(pixs[0][i],pixs[1][i],image.shape[1],image.shape[0]) 
         for ls in lst:
-            image[int(ls[1]),int(ls[0])] += ls[2] * brightness[i]
+            image[int(ls[1]),int(ls[0])] += ls[2] * brightness[i] # add the source flux to the corresponding pixel
             lim_lft,lim_rgt = ccd_width_buff_px/2 * resolution, (ccd_width_px + ccd_width_buff_px/2) * resolution 
             lim_down,lim_up = ccd_height_buff_px/2 * resolution, (ccd_height_px + ccd_height_buff_px/2) * resolution
-            if(lim_lft < int(ls[0]) < lim_rgt and lim_down < int(ls[1]) < lim_up):
-                add_PSF(image,int(ls[0]),int(ls[1]),seeing_arcsec,op_mode,resolution)
+            if(lim_lft < int(ls[0]) < lim_rgt and lim_down < int(ls[1]) < lim_up): # if the source is inside the FoV, add the PSF
+                add_PSF(image, int(ls[0]), int(ls[1]), seeing_arcsec, op_mode,resolution, kernel_dir)
     return image
 
-# In[19]:
+# In[20]:
 
 # Deprecated!
 # Convolve the image with a Gaussian atmospheric seeing model
@@ -378,7 +397,7 @@ def add_seeing(image, seeing_arcsec):
     sigma = seeing_px/2.355 # fhwm = 2*sqrt(2*ln(2))*sigma
     ker = convolution.Gaussian2DKernel(x_stddev = sigma , y_stddev = sigma)
     return convolution.convolve(image,ker)
-# In[20]:
+# In[21]:
 
 # Add background noise to the image (randomly for each pixel)
 # depends on the mean background level and exposure time (user inputs)
@@ -387,7 +406,7 @@ def add_bgd_noise(image, mean_bgd_mag_to_arcsec_squared, t_exp):
     mean = (rate * t_exp).value
     image += np.random.poisson(lam = mean, size = (image.shape[0],image.shape[1])) # for now, brightness = number of photo electrons 
     return image
-# In[21]:
+# In[22]:
 
 # Add the dark noise to the image (randomly for each pixel)
 # depends on the temperature, readout noise rms, and exposure time (all user inputs)
@@ -397,7 +416,7 @@ def add_read_dark_noise(image, temperature, read_rms, t_exp):
     var = (dark_rate * t_exp).value + read_rms.value**2
     image += np.random.normal(loc = mean, scale = np.sqrt(var), size = (image.shape[0],image.shape[1]))
     return image
-# In[22]:
+# In[23]:
 
 # Given positions on the sensor 'w_arr' (the columns of interest in units of px)
 # Return a number between 0-1 to indicate how much light reaches that column (a fraction of the photons are obscured by FIFFA)
@@ -412,7 +431,7 @@ def fiffa_shadow_at_col(w_arr):
     eta_vec[eta_vec > 1] = 1
     eta_vec[eta_vec < 0] = 0
     return np.flip(eta_vec)
-# In[23]:
+# In[24]:
 
 # accounts for shadow of the fiffa folding mirror
 # attenuates the count in every column appropriately, removing light that is blocked by FIFFA 
@@ -421,7 +440,7 @@ def add_fiffa_shadow(image):
     fiffa_shadow = np.diag(fiffa_shadow_at_col(columns))
     image = image @ fiffa_shadow
     return image
-# In[24]:
+# In[25]:
 
 # estimates PSF spot size at different positions on the CCD, due to coma + seeing 
 def get_psf_rms_after_seeing(field_arr_px, wc ,seeing_arcsec = 1.5*u.arcsec):
@@ -439,7 +458,7 @@ def get_psf_rms_after_seeing(field_arr_px, wc ,seeing_arcsec = 1.5*u.arcsec):
     rms_lst = cs_rms(np.abs(field_arr_px - wc))
     max_lst = cs_max(np.abs(field_arr_px - wc))
     return rms_lst , max_lst
-# In[25]:
+# In[26]:
 
 # Create the final sources table from Gaia (from querying Gaia to getting the correct measurment for MAST)
 def create_sources_table(max_mag, ra_center, dec_center, op_mode ,use_available_spectra = False):
@@ -451,7 +470,8 @@ def create_sources_table(max_mag, ra_center, dec_center, op_mode ,use_available_
     if(use_available_spectra):
         get_flux_from_spectrum(entries)
     return entries
-# In[26]:
+
+# In[27]:
 def create_wcs(ra_center, dec_center, op_mode, resolution):
     if(op_mode == 'Feed'):   
         axis_1_focus = int(ccd_width_buff_px/2) + feed_middle_width
@@ -483,8 +503,9 @@ def create_wcs(ra_center, dec_center, op_mode, resolution):
     'NAXIS2': nrows
     }
     return wcs.WCS(wcs_input_dict)
-# In[27]
+# In[28]
 
+# Deprecated! 
 # parallelize 'add_sources' to save time
 def add_sources_parallel(image, table, wcs_dict, t_exp, seeing_arcsec, op_mode, resolution):
     add = partial(add_sources, image, wcs_dict=wcs_dict, t_exp=t_exp, seeing_arcsec=seeing_arcsec, op_mode=op_mode, resolution=resolution)
@@ -499,25 +520,31 @@ def add_sources_parallel(image, table, wcs_dict, t_exp, seeing_arcsec, op_mode, 
         image_layers = p.map(add,partial_tbl_lst)
     
     return np.sum(image_layers,axis=0)
-# In[27]:
+# In[29]:
 
 # Create the simulated image from MAST based on the sources table prepered previously
-def create_image(sources_table, ra_center , dec_center, t_exp, bdg_mean_mag_to_arcsec_squared, seeing_arcsec, temperature, read_rms ,op_mode, resolution = 1):
+def create_image(sources_table, ra_center , dec_center, t_exp, bdg_mean_mag_to_arcsec_squared, seeing_arcsec, temperature, read_rms ,op_mode, resolution = 1 ,kernel_dir = None):
     wcs_dict = create_wcs(ra_center, dec_center, op_mode, resolution)
     nrows = resolution * (ccd_height_px + ccd_height_buff_px)
     ncols = resolution * (ccd_width_px + ccd_width_buff_px)
-    image = np.zeros((nrows, ncols))
-    image = add_sources(image, sources_table, wcs_dict, t_exp, seeing_arcsec, op_mode, resolution)
-    if resolution > 1:
+    image = np.zeros((nrows, ncols)) # create empty image with the correct dimensions
+    delete_kernels = False
+    if kernel_dir is None: # if no kernels were given, create them- and delete after use
+        kernel_dir = create_kernels(resolution,seeing_arcsec)
+        delete_kernels = True
+    image = add_sources(image, sources_table, wcs_dict, t_exp, seeing_arcsec, op_mode, resolution, kernel_dir) # add the PSF of each source in the FoV
+    if delete_kernels: # delete the kernels if they were created in this function
+        shutil.rmtree(kernel_dir)
+    if resolution > 1: # bin the image back to the correct size (if needed)
         image = bin_image(image,(int(nrows/resolution),int(ncols/resolution)))
-    image = image[int(ccd_height_buff_px/2):int(ccd_height_px+ccd_height_buff_px/2),int(ccd_width_buff_px/2):int(ccd_width_px+ccd_width_buff_px/2)]
-    image = add_bgd_noise(image, bdg_mean_mag_to_arcsec_squared, t_exp)
-    image = add_fiffa_shadow(image)
-    image = add_read_dark_noise(image,temperature,read_rms,t_exp)
-    image += baseline_per_px.value
+    image = image[int(ccd_height_buff_px/2):int(ccd_height_px+ccd_height_buff_px/2),int(ccd_width_buff_px/2):int(ccd_width_px+ccd_width_buff_px/2)] # remove the buffer
+    image = add_bgd_noise(image, bdg_mean_mag_to_arcsec_squared, t_exp) 
+    image = add_fiffa_shadow(image) 
+    image = add_read_dark_noise(image,temperature,read_rms,t_exp) 
+    image += baseline_per_px.value 
     return image
 
-# In[28]
+# In[30]
 
 # Class for making a figure interactive
 class Toolbar(NavigationToolbar2Tk):
@@ -547,7 +574,7 @@ def draw_figure_w_toolbar(canvas, fig, canvas_toolbar):
     toolbar.update()
     figure_canvas_agg.get_tk_widget().pack(side='right', fill='both', expand=1)
 
-# In[29]
+# In[31]
 
 # Plot the simulated image as interactive figure in new window
 def create_image_figure(image):
@@ -592,7 +619,7 @@ def interactive_image_window(image, params):
             else:
                 sg.popup_error('Invalid folder or name!')
     window.close()
-# In[30]
+# In[32]
 
 # Plot the SNR vs the position on the sensor, for magnitude of interest- in a new window
 # As a bonus, the function plots the spot size (in microns) vs the field
@@ -677,13 +704,14 @@ def snr_window(magnitudes, read_rms, t_exp = 1*u.s, seeing_arcsec = 1.5*u.arcsec
                 sg.popup_error('Invalid folder or name!')
 
     window.close()
-# In[31]:
+# In[33]:
 
 # Take user inputs, and turn them into an image
 def simulate_image(params):
     sources_table = create_sources_table(float(params['max_mag']), float(params['ra']), float(params['dec']) , params['op_mode'])
     image = create_image(sources_table, float(params['ra']), float(params['dec']), float(params['t_exp'])*u.s,
-                          float(params['bgd']), float(params['seeing']) * u.arcsec, int(params['temp']),float(params['read_rms'])*u.electron, params['op_mode'], params['resolution'])
+                          float(params['bgd']), float(params['seeing']) * u.arcsec, int(params['temp']),
+                          float(params['read_rms'])*u.electron, params['op_mode'], params['resolution'], params['kernel_dir'])
     return image
 
 # In[32]
