@@ -1,8 +1,11 @@
 .DS_Store
-MAST_VENV
+.venv
 PlateSolve3
 images
 ps_results
 new_psfs
 __pycache__
 essential_files/kernels_tmp
+dist
+build
+simulate.spec

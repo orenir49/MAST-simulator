@@ -91,7 +91,7 @@ ccd_full_well = 15000 * u.electron
 baseline_per_px = 20 * u.electron 
 
 # Focal points (middle of field) projection on CCD "width" axis, for different modes of operation
-feed_middle_width = int(ccd_width_px/2 - 1)
+spectra_middle_width = int(ccd_width_px/2 - 1)
 wide_middle_width = 4300
 narrow_middle_width = 803
 
@@ -119,11 +119,11 @@ def query_gaia(query):
 # Documentation about the table GAIADR3.GAIA_SOURCE can be found at: https://gea.esac.esa.int/archive/documentation/GDR3/Gaia_archive/chap_datamodel/sec_dm_main_source_catalogue/ssec_dm_gaia_source.html
 
 def query_gaia_for_sources_in_region(max_mag, ra_deg, dec_deg, ccd_width_range_deg, ccd_height_range_deg, op_mode):
-    if(op_mode == 'Feed'):   
-        wc = int(ccd_width_buff_px/2) + feed_middle_width
-    elif(op_mode == 'Shifted_wide'):
+    if(op_mode == 'Spectra'):   
+        wc = int(ccd_width_buff_px/2) + spectra_middle_width
+    elif(op_mode == 'Image'):
         wc = int(ccd_width_buff_px/2) + wide_middle_width
-    elif(op_mode == 'Shifted_narrow'):
+    elif(op_mode == 'Image_narrow'):
         wc = int(ccd_width_buff_px/2) + narrow_middle_width
 
     fraction_left_of_focus = wc/(ccd_width_buff_px + ccd_width_px) # we know: RA range the CCD covers, and reference "wc" corresponding to input ra_deg
@@ -337,11 +337,11 @@ def rot(psf,ang,ang0):
 def add_PSF(image, w, h, seeing_arcsec, op_mode, resolution, kernel_dir): 
     
     # the center of the FoV is not necessarily in the center of the image
-    if(op_mode == 'Feed'):   
-        wc = int(ccd_width_buff_px/2) + feed_middle_width
-    elif(op_mode == 'Shifted_wide'):
+    if(op_mode == 'Spectra'):   
+        wc = int(ccd_width_buff_px/2) + spectra_middle_width
+    elif(op_mode == 'Image'):
         wc = int(ccd_width_buff_px/2) + wide_middle_width
-    elif(op_mode == 'Shifted_narrow'):
+    elif(op_mode == 'Image_narrow'):
         wc = int(ccd_width_buff_px/2) + narrow_middle_width
     hc = int(ccd_height_buff_px/2) + int(ccd_height_px/2) - 1
         
@@ -473,11 +473,11 @@ def create_sources_table(max_mag, ra_center, dec_center, op_mode ,use_available_
 
 # In[27]:
 def create_wcs(ra_center, dec_center, op_mode, resolution):
-    if(op_mode == 'Feed'):   
-        axis_1_focus = int(ccd_width_buff_px/2) + feed_middle_width
-    elif(op_mode == 'Shifted_wide'):
+    if(op_mode == 'Spectra'):   
+        axis_1_focus = int(ccd_width_buff_px/2) + spectra_middle_width
+    elif(op_mode == 'Image'):
         axis_1_focus = int(ccd_width_buff_px/2) + wide_middle_width
-    elif(op_mode == 'Shifted_narrow'):
+    elif(op_mode == 'Image_narrow'):
         axis_1_focus = int(ccd_width_buff_px/2) + narrow_middle_width
     axis_2_focus = int(ccd_height_buff_px/2) + int(ccd_height_px/2) - 1
         
@@ -623,12 +623,12 @@ def interactive_image_window(image, params):
 
 # Plot the SNR vs the position on the sensor, for magnitude of interest- in a new window
 # As a bonus, the function plots the spot size (in microns) vs the field
-def create_snr_figure(magnitudes, read_rms, t_exp = 1*u.s, seeing_arcsec = 1.5*u.arcsec ,mag_arcsec_squared = 20.5 , temp = -15, op_mode = 'Feed'):
-    if(op_mode == 'Feed'):   
-        wc = feed_middle_width
-    elif(op_mode == 'Shifted_wide'):
+def create_snr_figure(magnitudes, read_rms, t_exp = 1*u.s, seeing_arcsec = 1.5*u.arcsec ,mag_arcsec_squared = 20.5 , temp = -15, op_mode = 'Spectra'):
+    if(op_mode == 'Spectra'):   
+        wc = spectra_middle_width
+    elif(op_mode == 'Image'):
         wc = wide_middle_width
-    elif(op_mode == 'Shifted_narrow'):
+    elif(op_mode == 'Image_narrow'):
         wc = narrow_middle_width
     field_arr_px = []
     for r in r_lst:
@@ -650,30 +650,30 @@ def create_snr_figure(magnitudes, read_rms, t_exp = 1*u.s, seeing_arcsec = 1.5*u
     SNR = np.zeros((len(N_source),len(field_arr_px)))
 
     fig,(ax1,ax2) = plt.subplots(ncols=2,dpi=120)
-    ax1.set_xlabel('Field (deg)', fontdict={'size': 12})
+    ax1.set_xlabel('CCD column (px)', fontdict={'size': 12})
     ax1.set_ylabel('SNR', fontdict={'size': 12})
     for i,ns in enumerate(N_source):
         ns_detected = ns * fiffa_shadow
         SNR[i] = ns_detected/np.sqrt(ns_detected + n_pix*(N_bgd*fiffa_shadow + N_dark + N_read**2))
-        ax1.plot(field_arr_deg,SNR[i],label=f'mag={magnitudes[i]}')
+        ax1.plot(field_arr_px,SNR[i],label=f'mag={magnitudes[i]}')
         ns_peak = np.multiply(ns_detected,psf_max_vs_px)
         for j,peak in enumerate(ns_peak):
             if (peak >= ccd_full_well.value):
-                ax1.scatter(field_arr_deg[j],SNR[i][j],marker='x',c='Crimson',label='Saturation')
+                ax1.scatter(field_arr_px[j],SNR[i][j],marker='x',c='Crimson',label='Saturation')
 
     handles, labels = ax1.get_legend_handles_labels()
     unique = [(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]
     ax1.legend(*zip(*unique),loc=[0.55,0.05])
     ax1.grid()
-    ax2.set_xlabel('Field (deg)', fontdict={'size':12})
+    ax2.set_xlabel('CCD column (px)', fontdict={'size':12})
     ax2.set_ylabel('Spot size ($\mu m$)',fontdict={'size':12})
-    ax2.scatter(field_arr_deg, rms_arr_after_seeing_px * ccd_px_side_length_micron, s = 10, c = 'Crimson')
+    ax2.scatter(field_arr_px, rms_arr_after_seeing_px * ccd_px_side_length_micron, s = 10, c = 'Crimson')
     ax2.grid()
     fig.tight_layout()
-    return fig, field_arr_deg, SNR
+    return fig, field_arr_px, SNR
 
-def snr_window(magnitudes, read_rms, t_exp = 1*u.s, seeing_arcsec = 1.5*u.arcsec ,mag_arcsec_squared = 20.5 , temp = -15, op_mode = 'Feed'):
-    fig , field_arr_deg, SNR = create_snr_figure(magnitudes, read_rms, t_exp, seeing_arcsec, mag_arcsec_squared, temp, op_mode)
+def snr_window(magnitudes, read_rms, t_exp = 1*u.s, seeing_arcsec = 1.5*u.arcsec ,mag_arcsec_squared = 20.5 , temp = -15, op_mode = 'Spectra'):
+    fig , field_arr_px, SNR = create_snr_figure(magnitudes, read_rms, t_exp, seeing_arcsec, mag_arcsec_squared, temp, op_mode)
     params_str = '|'.join((
     r't_exp=%d (sec) ' % (t_exp.value, ),
     r' background=%.1f (mag/arcsec**2) ' % (mag_arcsec_squared, ),
@@ -689,7 +689,7 @@ def snr_window(magnitudes, read_rms, t_exp = 1*u.s, seeing_arcsec = 1.5*u.arcsec
     window.move_to_center()
     draw_figure(window['fig_cv'].TKCanvas, fig)
     
-    params_str = params_str + '\n left column: Field (deg) , right column: SNR'
+    params_str = params_str + '\n left column: Column (px) , right column: SNR'
     while True:
         event, values = window.read()
         if event in (sg.WIN_CLOSED, 'Exit'):  # always,  always give a way out!
@@ -697,7 +697,7 @@ def snr_window(magnitudes, read_rms, t_exp = 1*u.s, seeing_arcsec = 1.5*u.arcsec
         if event == 'Save SNR plot as txt':
             if os.path.exists(values['folder']) and len(values['name']) > 0:
                 for i,mag in enumerate(magnitudes):
-                    df = pd.DataFrame({'Field_(deg)':field_arr_deg,'SNR':SNR[i]})
+                    df = pd.DataFrame({'Column_(px)':field_arr_px,'SNR':SNR[i]})
                     np.savetxt(os.path.normpath(os.path.join(values['folder'] , values['name'] + f'_G_mag{mag}')) +'.txt', df.values , header= params_str)
                 sg.popup_ok('Saved successfully')
             else:
@@ -711,7 +711,7 @@ def simulate_image(params):
     sources_table = create_sources_table(float(params['max_mag']), float(params['ra']), float(params['dec']) , params['op_mode'])
     image = create_image(sources_table, float(params['ra']), float(params['dec']), float(params['t_exp'])*u.s,
                           float(params['bgd']), float(params['seeing']) * u.arcsec, int(params['temp']),
-                          float(params['read_rms'])*u.electron, params['op_mode'], params['resolution'], params['kernel_dir'])
+                          float(params['read_rms'])*u.electron, params['op_mode'], params['resolution'])
     return image
 
 # In[32]
@@ -722,11 +722,11 @@ def main_window():
             sg.T('Exposure (sec)'), sg.InputText(default_text = 1, key = 't_exp',size=(5,2)),sg.T('Seeing FWHM (arcsec)'),
             sg.InputText(default_text = 1.5 ,key='seeing',size=(5,2))],[sg.T('Background (G-mag/arcsec**2)'),
                 sg.InputText(default_text = 20.5, key = 'bgd',size=(5,2)), sg.T('Read out RMS (e/px)'),
-                sg.InputText(default_text = 3.6 ,key='read_rms',size=(5,2)),sg.T('Temperature (C)'),sg.DropDown(values=list(dark['temp'].values),
-                default_value=dark['temp'][1],key='temp',size=(5,4))],
-                [sg.T('G-band magnitudes for SNR plot'),sg.Listbox(values = [10,11,12,13,14,15,16,17,18], default_values = [15,16],select_mode=sg.LISTBOX_SELECT_MODE_MULTIPLE,key='mag_lst',size=(10,3)),
-                sg.T('Mode of operation'),sg.DropDown(values=['Feed','Shifted_wide','Shifted_narrow'],default_value='Feed',key='op_mode'),
-                sg.B(button_text='Simulate Image'),sg.B(button_text='Plot SNR vs. Field')]]
+                sg.InputText(default_text = 3.0 ,key='read_rms',size=(5,2)),sg.T('Temperature (C)'),sg.DropDown(values=list(dark['temp'].values),
+                default_value=dark['temp'][1],key='temp',size=(5,4)),sg.T('Resolution (binning)'),sg.DropDown(values=[1,2,3,4,5],default_value=1,key='resolution',size=(5,4))]
+                ,[sg.T('G-band magnitudes for SNR plot'),sg.Listbox(values = [10,11,12,13,14,15,16,17,18], default_values = [15,16],select_mode=sg.LISTBOX_SELECT_MODE_MULTIPLE,key='mag_lst',size=(10,3)),
+                sg.T('Mode of operation'),sg.DropDown(values=['Spectra','Image','Image_narrow'],default_value='Spectra',key='op_mode'),
+                sg.B(button_text='Simulate Image'),sg.B(button_text='Plot SNR vs. CCD column')]]
     sg.set_options(font=("Arial", 13))
     main_wind = sg.Window('Imaging parameters',layout_main,element_justification='c',finalize=True)
     main_wind.move_to_center()
@@ -738,7 +738,7 @@ def main_window():
         elif event == 'Simulate Image':
             image = simulate_image(params)
             interactive_image_window(image,params)
-        elif event == 'Plot SNR vs. Field':
+        elif event == 'Plot SNR vs. CCD column':
             snr_window(np.array(params['mag_lst']),float(params['read_rms']) * u.electron,float(params['t_exp'])* u.s,
                                 float(params['seeing']) * u.arcsec, float(params['bgd']), int(params['temp']),params['op_mode'])
 
