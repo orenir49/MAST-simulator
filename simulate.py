@@ -45,16 +45,19 @@ d_filters = {'Band':['G'],'Wavelength':[639.07*u.nm],'Bandpass':[454.82*u.nm],'c
 filters = pd.DataFrame(data=d_filters)
 
 # MAST CCD constants
-# Pixels in the CCD
-ccd_width_px = 5496
-ccd_height_px = 3672
+# Number of pixels in the CCD
+# ccd_width_px = 5496 # ASI183MM   
+# ccd_height_px = 3672 # ASI183MM 
+ccd_width_px = 8288 # ASI294MM
+ccd_height_px = 5644 # ASI294MM
 
 # Buffer of pixels when querying data and performing the convolution
 ccd_width_buff_px = 512
 ccd_height_buff_px = 512
 
-# The lenght of each pixel in the CCD
-ccd_px_side_length_micron = 2.4 * u.micron
+# The length of each pixel in the CCD
+# ccd_px_side_length_micron = 2.4 * u.micron # ASI183MM
+ccd_px_side_length_micron = 2.3 * u.micron # ASI294MM
 ccd_width_micron = ccd_width_px * ccd_px_side_length_micron
 ccd_height_micron = ccd_height_px * ccd_px_side_length_micron
 ccd_width_buff_micron = ccd_width_buff_px * ccd_px_side_length_micron
@@ -85,15 +88,18 @@ ccd_width_buff_range_deg = ccd_width_buff_range_arcsec.to(u.deg)
 ccd_height_buff_range_deg = ccd_height_buff_range_arcsec.to(u.deg)
 
 # Saturation of the CCD per pixel
-ccd_full_well = 15000 * u.electron
+# ccd_full_well = 15000 * u.electron # ASI183MM
+ccd_full_well = 14400 * u.electron # ASI294MM
 
 # Arbitrary count added to each pixel before printing image
 baseline_per_px = 20 * u.electron 
 
 # Focal points (middle of field) projection on CCD "width" axis, for different modes of operation
 spectra_middle_width = int(ccd_width_px/2 - 1)
-wide_middle_width = 4300
-narrow_middle_width = 803
+# wide_middle_width = 4300 # ASI183MM
+# narrow_middle_width = 803 # ASI183MM
+wide_middle_width = 5763 # ASI294MM
+narrow_middle_width = 2114 # ASI294MM
 
 # Gaia constants
 gaia_collecting_area_m2 = 0.7 * u.m**2
@@ -104,8 +110,11 @@ mag_ZP = 9.953577 # magnitude of arbitrary star I picked from the simulation
 flux_ZP = 230465 # flux detected with MAST, calculated using the spectrum
 
 # PSF properties
-r_lst = [0, 423, 847, 1271, 1695, 2119, 2543, 2967, 3391, 3815, 4239, 4663, 5087, 5511, 5935, 6358, 6782]
+# r_lst = [0, 423, 847, 1271, 1695, 2119, 2543, 2967, 3391, 3815, 4239, 4663, 5087, 5511, 5935, 6358, 6782] # ASI183MM
+# kernels_dirname = 'kernels_183' # ASI183MM
 ang0 = 90
+r_lst = [0, 442, 884, 1327, 1769, 2211, 2654, 3096, 3538, 3981, 4423, 4865, 5308, 5750, 6193, 6635, 7077] # ASI294MM
+kernels_dirname = 'kernels_294' # ASI294MM
 
 # General function to query from Gaia using ADQL
 # Help can be found be found at: https://www.cosmos.esa.int/web/gaia-users/archive/writing-queries
@@ -139,7 +148,7 @@ def query_gaia_for_sources_in_region(max_mag, ra_deg, dec_deg, ccd_width_range_d
         max_mag = max_mag,
         ra_min = ra_deg-(fraction_left_of_focus * ccd_width_range_deg.value), ra_max=ra_deg+(fraction_right_of_focus * ccd_width_range_deg.value),
         dec_min = dec_deg-(ccd_height_range_deg.value/2), dec_max=dec_deg+(ccd_height_range_deg.value/2)
-    )
+    )   
     return query_gaia(query)
 
 # In[6]:
@@ -169,7 +178,7 @@ def get_flux_from_spectrum(table):
         t = datalink[dl_key][0]
         source_id = t.get_field_by_id('source_id').value
         t = t.to_table()
-        y1arr = qe['QE'].values[int((lmin.value-336)/2):int((lmax.value-336)/2)]
+        y1arr = qe['QE183'].values[int((lmin.value-336)/2):int((lmax.value-336)/2)]
         y2arr = np.ma.getdata(t['flux'].value)[int((lmin.value-336)/2):int((lmax.value-336)/2)]
         xarr = qe['Wavelength'].values[int((lmin.value-336)/2):int((lmax.value-336)/2)]
         fmast = np.trapz(y1arr*y2arr*xarr*1e-9/h.value/c.value,xarr)*atm_extinction_telescope_eff*mast_collecting_area_m2/u.m**2
@@ -178,7 +187,9 @@ def get_flux_from_spectrum(table):
 
 # Calculate the mean quantum efficiency of Gaia, based on the wavelenghts of intrest
 def calculate_effective_qe(min_wavelen, max_wavelen):
-    return np.mean(qe[qe['Wavelength'].isin(qe['Wavelength'].where((qe['Wavelength'] >= min_wavelen) & (qe['Wavelength'] < max_wavelen)).dropna())]['QE'])
+    # qe_colname = 'QE183' # ASI183MM
+    qe_colname = 'QE294' # ASI294MM
+    return np.mean(qe[qe['Wavelength'].isin(qe['Wavelength'].where((qe['Wavelength'] >= min_wavelen) & (qe['Wavelength'] < max_wavelen)).dropna())][qe_colname])
 # In[9]:
 
 # Given the flux density as seen at Gaia, calculate the flux as measured in MAST
@@ -277,7 +288,7 @@ def interp_kernel(ker,resolution):
 ## return the path to the temporary directory where the kernels are saved
 
 def create_kernels(resolution,seeing):
-    dirpath = os.path.join('.','essential_files','kernels_u')
+    dirpath = os.path.join('.','essential_files',kernels_dirname)
     tmpdirpath = os.path.join('.','essential_files','kernels_tmp')
     os.mkdir(tmpdirpath)
     filenames = next(os.walk(dirpath), (None, None, []))[2]
@@ -447,7 +458,7 @@ def get_psf_rms_after_seeing(field_arr_px, wc ,seeing_arcsec = 1.5*u.arcsec):
     rms_lst = []
     max_lst = []
     for r in r_lst:
-        ker = np.load(os.path.join('.','essential_files','kernels_u', str.format(r'r={}.npy',r)))
+        ker = np.load(os.path.join('.','essential_files',kernels_dirname, str.format(r'r={}.npy',r)))
         sigma = seeing_arcsec/plate_scale_arcsec_px/2.355 # fhwm = 2*sqrt(2*ln(2))*sigma
         gaus_ker = convolution.Gaussian2DKernel(sigma,sigma)
         ker = convolution.convolve(ker,gaus_ker)
@@ -465,6 +476,11 @@ def create_sources_table(max_mag, ra_center, dec_center, op_mode ,use_available_
     coor_width_range_deg = (ccd_width_range_deg + ccd_width_buff_range_deg) / np.cos(np.deg2rad(dec_center))
     coor_height_range_deg = ccd_height_range_deg + ccd_height_buff_range_deg
     entries = query_gaia_for_sources_in_region(max_mag, ra_center, dec_center, coor_width_range_deg, coor_height_range_deg, op_mode)
+    j = 0
+    while len(entries) == 2000: ## synchronous queries are limited to 2000 rows, if hit limit: image probably not complete.
+        max_mag -= 0.3**j
+        j += 1
+        entries = query_gaia_for_sources_in_region(max_mag, ra_center, dec_center, coor_width_range_deg, coor_height_range_deg, op_mode)
     calc_gaia_flux_density_from_gaia_flux(entries)
     convert_gaia_flux_density_to_mast_flux(entries)
     if(use_available_spectra):
@@ -579,7 +595,7 @@ def draw_figure_w_toolbar(canvas, fig, canvas_toolbar):
 # Plot the simulated image as interactive figure in new window
 def create_image_figure(image):
     fig,ax = plt.subplots(figsize=(9,7), dpi=120)
-    mappable = ax.imshow(image, origin='lower', cmap='Greys', norm=colors.LogNorm())
+    mappable = ax.imshow(image, origin='lower', cmap='Greys_r', norm=colors.LogNorm())
     ax.xaxis.set_visible(False)
     ax.yaxis.set_visible(False)
     cbar = fig.colorbar(mappable, ax=ax, shrink=0.7, pad = 0.05, format='%1.1E')
@@ -711,7 +727,7 @@ def simulate_image(params):
     sources_table = create_sources_table(float(params['max_mag']), float(params['ra']), float(params['dec']) , params['op_mode'])
     image = create_image(sources_table, float(params['ra']), float(params['dec']), float(params['t_exp'])*u.s,
                           float(params['bgd']), float(params['seeing']) * u.arcsec, int(params['temp']),
-                          float(params['read_rms'])*u.electron, params['op_mode'], params['resolution'])
+                          float(params['read_rms'])*u.electron, params['op_mode'], params['resolution'],params['kernel_dir'])
     return image
 
 # In[32]
