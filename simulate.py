@@ -98,8 +98,8 @@ baseline_per_px = 20 * u.electron
 spectra_middle_width = int(ccd_width_px/2 - 1)
 # wide_middle_width = 4300 # ASI183MM
 # narrow_middle_width = 803 # ASI183MM
-wide_middle_width = 5763 # ASI294MM
-narrow_middle_width = 2114 # ASI294MM
+wide_middle_width = 7400 # ASI294MM
+narrow_middle_width = 600 # ASI294MM
 
 # Gaia constants
 gaia_collecting_area_m2 = 0.7 * u.m**2
@@ -113,7 +113,7 @@ flux_ZP = 230465 # flux detected with MAST, calculated using the spectrum
 # r_lst = [0, 423, 847, 1271, 1695, 2119, 2543, 2967, 3391, 3815, 4239, 4663, 5087, 5511, 5935, 6358, 6782] # ASI183MM
 # kernels_dirname = 'kernels_183' # ASI183MM
 ang0 = 90
-r_lst = [0, 442, 884, 1327, 1769, 2211, 2654, 3096, 3538, 3981, 4423, 4865, 5308, 5750, 6193, 6635, 7077] # ASI294MM
+r_lst = [0, 467, 934, 1401, 1868, 2337, 2804, 3271, 3738, 4205, 4672, 5139, 5607, 6074, 6541, 7009, 7476, 7944, 8411, 8878] # ASI294MM
 kernels_dirname = 'kernels_294' # ASI294MM
 
 # General function to query from Gaia using ADQL
