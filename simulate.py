@@ -31,7 +31,7 @@ from functools import partial
 
 # Making the notebook interactive
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
-import PySimpleGUI as sg
+# import PySimpleGUI as sg
 
 #In[2]
 # Defining the constants of the notebook
@@ -563,32 +563,32 @@ def create_image(sources_table, ra_center , dec_center, t_exp, bdg_mean_mag_to_a
 # In[30]
 
 # Class for making a figure interactive
-class Toolbar(NavigationToolbar2Tk):
-    def __init__(self, *args, **kwargs):
-        super(Toolbar, self).__init__(*args, **kwargs)
+# class Toolbar(NavigationToolbar2Tk):
+#     def __init__(self, *args, **kwargs):
+#         super(Toolbar, self).__init__(*args, **kwargs)
 
 # Plot a regular figure in some window
-def draw_figure(canvas, fig):
-    if canvas.children:
-        for child in canvas.winfo_children():
-            child.destroy()
-    figure_canvas_agg = FigureCanvasTkAgg(fig, master=canvas)
-    figure_canvas_agg.draw()
-    figure_canvas_agg.get_tk_widget().pack(side='right', fill='both', expand=1)    
+# def draw_figure(canvas, fig):
+#     if canvas.children:
+#         for child in canvas.winfo_children():
+#             child.destroy()
+#     figure_canvas_agg = FigureCanvasTkAgg(fig, master=canvas)
+#     figure_canvas_agg.draw()
+#     figure_canvas_agg.get_tk_widget().pack(side='right', fill='both', expand=1)    
 
-# Plot an interactive figure in some window
-def draw_figure_w_toolbar(canvas, fig, canvas_toolbar):
-    if canvas.children:
-        for child in canvas.winfo_children():
-            child.destroy()
-    if canvas_toolbar.children:
-        for child in canvas_toolbar.winfo_children():
-            child.destroy()
-    figure_canvas_agg = FigureCanvasTkAgg(fig, master=canvas)
-    figure_canvas_agg.draw()
-    toolbar = Toolbar(figure_canvas_agg, canvas_toolbar)
-    toolbar.update()
-    figure_canvas_agg.get_tk_widget().pack(side='right', fill='both', expand=1)
+# # Plot an interactive figure in some window
+# def draw_figure_w_toolbar(canvas, fig, canvas_toolbar):
+#     if canvas.children:
+#         for child in canvas.winfo_children():
+#             child.destroy()
+#     if canvas_toolbar.children:
+#         for child in canvas_toolbar.winfo_children():
+#             child.destroy()
+#     figure_canvas_agg = FigureCanvasTkAgg(fig, master=canvas)
+#     figure_canvas_agg.draw()
+#     toolbar = Toolbar(figure_canvas_agg, canvas_toolbar)
+#     toolbar.update()
+#     figure_canvas_agg.get_tk_widget().pack(side='right', fill='both', expand=1)
 
 # In[31]
 
@@ -612,114 +612,114 @@ def save_as_fits(image,params,filename):
         hdu.header.append(hd)
     hdu.writeto(filename,overwrite=True)
 
-def interactive_image_window(image, params):
-    fig = create_image_figure(image)
-    canvas_size = (fig.get_dpi()*fig.get_size_inches()[0],fig.get_dpi()*fig.get_size_inches()[1])
-    layout = [[sg.T('Controls:')],[sg.Canvas(key='controls_cv')],
-    [sg.Column(layout=[[sg.Canvas(key='fig_cv',size=canvas_size)]],background_color='#DAE0E6')],
-    [sg.FolderBrowse(button_text='choose output folder',key='folder'),sg.InputText(default_text='file_name',key='name',size=(20,5)),sg.B('Save as FITS'),sg.B('Exit')]]
+# def interactive_image_window(image, params):
+#     fig = create_image_figure(image)
+#     canvas_size = (fig.get_dpi()*fig.get_size_inches()[0],fig.get_dpi()*fig.get_size_inches()[1])
+#     layout = [[sg.T('Controls:')],[sg.Canvas(key='controls_cv')],
+#     [sg.Column(layout=[[sg.Canvas(key='fig_cv',size=canvas_size)]],background_color='#DAE0E6')],
+#     [sg.FolderBrowse(button_text='choose output folder',key='folder'),sg.InputText(default_text='file_name',key='name',size=(20,5)),sg.B('Save as FITS'),sg.B('Exit')]]
     
-    window = sg.Window('Image', layout,finalize = True, resizable = True,element_justification='c')
-    window.move_to_center()
-    draw_figure_w_toolbar(window['fig_cv'].TKCanvas, fig, window['controls_cv'].TKCanvas)
+#     window = sg.Window('Image', layout,finalize = True, resizable = True,element_justification='c')
+#     window.move_to_center()
+#     draw_figure_w_toolbar(window['fig_cv'].TKCanvas, fig, window['controls_cv'].TKCanvas)
 
-    while True:
-        event, values = window.read()
-        if event in (sg.WIN_CLOSED, 'Exit'):  # always,  always give a way out!
-            break
-        if event == 'Save as FITS':
-            if os.path.exists(values['folder']) and len(values['name']) > 0:
-                filename = os.path.normpath(os.path.join(values['folder'],values['name']))+'.fits'
-                save_as_fits(image, params, filename)
-                sg.popup_ok('Saved successfully')
-            else:
-                sg.popup_error('Invalid folder or name!')
-    window.close()
+#     while True:
+#         event, values = window.read()
+#         if event in (sg.WIN_CLOSED, 'Exit'):  # always,  always give a way out!
+#             break
+#         if event == 'Save as FITS':
+#             if os.path.exists(values['folder']) and len(values['name']) > 0:
+#                 filename = os.path.normpath(os.path.join(values['folder'],values['name']))+'.fits'
+#                 save_as_fits(image, params, filename)
+#                 sg.popup_ok('Saved successfully')
+#             else:
+#                 sg.popup_error('Invalid folder or name!')
+#     window.close()
 # In[32]
 
-# Plot the SNR vs the position on the sensor, for magnitude of interest- in a new window
-# As a bonus, the function plots the spot size (in microns) vs the field
-def create_snr_figure(magnitudes, read_rms, t_exp = 1*u.s, seeing_arcsec = 1.5*u.arcsec ,mag_arcsec_squared = 20.5 , temp = -15, op_mode = 'Spectra'):
-    if(op_mode == 'Spectra'):   
-        wc = spectra_middle_width
-    elif(op_mode == 'Image'):
-        wc = wide_middle_width
-    elif(op_mode == 'Image_narrow'):
-        wc = narrow_middle_width
-    field_arr_px = []
-    for r in r_lst:
-        if(wc - r > 0):
-            field_arr_px.append(wc-r)
-        if(wc + r < ccd_width_px):
-            field_arr_px.append(wc+r)
-    field_arr_px = np.sort(field_arr_px)
-    field_arr_deg = (field_arr_px - wc) * plate_scale_arcsec_px.to(u.deg).value
+# # Plot the SNR vs the position on the sensor, for magnitude of interest- in a new window
+# # As a bonus, the function plots the spot size (in microns) vs the field
+# def create_snr_figure(magnitudes, read_rms, t_exp = 1*u.s, seeing_arcsec = 1.5*u.arcsec ,mag_arcsec_squared = 20.5 , temp = -15, op_mode = 'Spectra'):
+#     if(op_mode == 'Spectra'):   
+#         wc = spectra_middle_width
+#     elif(op_mode == 'Image'):
+#         wc = wide_middle_width
+#     elif(op_mode == 'Image_narrow'):
+#         wc = narrow_middle_width
+#     field_arr_px = []
+#     for r in r_lst:
+#         if(wc - r > 0):
+#             field_arr_px.append(wc-r)
+#         if(wc + r < ccd_width_px):
+#             field_arr_px.append(wc+r)
+#     field_arr_px = np.sort(field_arr_px)
+#     field_arr_deg = (field_arr_px - wc) * plate_scale_arcsec_px.to(u.deg).value
     
-    N_source = flux_ZP * 10**(-0.4*(magnitudes - mag_ZP)) * t_exp.value # rough estimate of electron flux from source of known magnitude
-    rms_arr_after_seeing_px , psf_max_vs_px = get_psf_rms_after_seeing(field_arr_px, wc , seeing_arcsec)
-    fiffa_shadow = fiffa_shadow_at_col(field_arr_px)
-    n_pix = 1 + (rms_arr_after_seeing_px)**2 # rough estimate of total pixel number in the PSF
-    N_bgd = flux_ZP * 10**(-0.4*(mag_arcsec_squared - mag_ZP)) * (plate_scale_arcsec_px.value)**2 * t_exp.value
-    dark_rate = dark[dark.temp == temp].iloc[0]['e/s/pix'] * u.electron/u.s
-    N_dark = (dark_rate * t_exp).value 
-    N_read = read_rms.value
-    SNR = np.zeros((len(N_source),len(field_arr_px)))
+#     N_source = flux_ZP * 10**(-0.4*(magnitudes - mag_ZP)) * t_exp.value # rough estimate of electron flux from source of known magnitude
+#     rms_arr_after_seeing_px , psf_max_vs_px = get_psf_rms_after_seeing(field_arr_px, wc , seeing_arcsec)
+#     fiffa_shadow = fiffa_shadow_at_col(field_arr_px)
+#     n_pix = 1 + (rms_arr_after_seeing_px)**2 # rough estimate of total pixel number in the PSF
+#     N_bgd = flux_ZP * 10**(-0.4*(mag_arcsec_squared - mag_ZP)) * (plate_scale_arcsec_px.value)**2 * t_exp.value
+#     dark_rate = dark[dark.temp == temp].iloc[0]['e/s/pix'] * u.electron/u.s
+#     N_dark = (dark_rate * t_exp).value 
+#     N_read = read_rms.value
+#     SNR = np.zeros((len(N_source),len(field_arr_px)))
 
-    fig,(ax1,ax2) = plt.subplots(ncols=2,dpi=120)
-    ax1.set_xlabel('CCD column (px)', fontdict={'size': 12})
-    ax1.set_ylabel('SNR', fontdict={'size': 12})
-    for i,ns in enumerate(N_source):
-        ns_detected = ns * fiffa_shadow
-        SNR[i] = ns_detected/np.sqrt(ns_detected + n_pix*(N_bgd*fiffa_shadow + N_dark + N_read**2))
-        ax1.plot(field_arr_px,SNR[i],label=f'mag={magnitudes[i]}')
-        ns_peak = np.multiply(ns_detected,psf_max_vs_px)
-        for j,peak in enumerate(ns_peak):
-            if (peak >= ccd_full_well.value):
-                ax1.scatter(field_arr_px[j],SNR[i][j],marker='x',c='Crimson',label='Saturation')
+#     fig,(ax1,ax2) = plt.subplots(ncols=2,dpi=120)
+#     ax1.set_xlabel('CCD column (px)', fontdict={'size': 12})
+#     ax1.set_ylabel('SNR', fontdict={'size': 12})
+#     for i,ns in enumerate(N_source):
+#         ns_detected = ns * fiffa_shadow
+#         SNR[i] = ns_detected/np.sqrt(ns_detected + n_pix*(N_bgd*fiffa_shadow + N_dark + N_read**2))
+#         ax1.plot(field_arr_px,SNR[i],label=f'mag={magnitudes[i]}')
+#         ns_peak = np.multiply(ns_detected,psf_max_vs_px)
+#         for j,peak in enumerate(ns_peak):
+#             if (peak >= ccd_full_well.value):
+#                 ax1.scatter(field_arr_px[j],SNR[i][j],marker='x',c='Crimson',label='Saturation')
 
-    handles, labels = ax1.get_legend_handles_labels()
-    unique = [(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]
-    ax1.legend(*zip(*unique),loc=[0.55,0.05])
-    ax1.grid()
-    ax2.set_xlabel('CCD column (px)', fontdict={'size':12})
-    ax2.set_ylabel('Spot size ($\mu m$)',fontdict={'size':12})
-    ax2.scatter(field_arr_px, rms_arr_after_seeing_px * ccd_px_side_length_micron, s = 10, c = 'Crimson')
-    ax2.grid()
-    fig.tight_layout()
-    return fig, field_arr_px, SNR
+#     handles, labels = ax1.get_legend_handles_labels()
+#     unique = [(h, l) for i, (h, l) in enumerate(zip(handles, labels)) if l not in labels[:i]]
+#     ax1.legend(*zip(*unique),loc=[0.55,0.05])
+#     ax1.grid()
+#     ax2.set_xlabel('CCD column (px)', fontdict={'size':12})
+#     ax2.set_ylabel('Spot size ($\mu m$)',fontdict={'size':12})
+#     ax2.scatter(field_arr_px, rms_arr_after_seeing_px * ccd_px_side_length_micron, s = 10, c = 'Crimson')
+#     ax2.grid()
+#     fig.tight_layout()
+#     return fig, field_arr_px, SNR
 
-def snr_window(magnitudes, read_rms, t_exp = 1*u.s, seeing_arcsec = 1.5*u.arcsec ,mag_arcsec_squared = 20.5 , temp = -15, op_mode = 'Spectra'):
-    fig , field_arr_px, SNR = create_snr_figure(magnitudes, read_rms, t_exp, seeing_arcsec, mag_arcsec_squared, temp, op_mode)
-    params_str = '|'.join((
-    r't_exp=%d (sec) ' % (t_exp.value, ),
-    r' background=%.1f (mag/arcsec**2) ' % (mag_arcsec_squared, ),
-    r' seeing=%.2f" (arcsec) ' % (seeing_arcsec.value, ),
-    r' read out rms=%.1f electrons/px ' % (read_rms.value, )))
+# def snr_window(magnitudes, read_rms, t_exp = 1*u.s, seeing_arcsec = 1.5*u.arcsec ,mag_arcsec_squared = 20.5 , temp = -15, op_mode = 'Spectra'):
+#     fig , field_arr_px, SNR = create_snr_figure(magnitudes, read_rms, t_exp, seeing_arcsec, mag_arcsec_squared, temp, op_mode)
+#     params_str = '|'.join((
+#     r't_exp=%d (sec) ' % (t_exp.value, ),
+#     r' background=%.1f (mag/arcsec**2) ' % (mag_arcsec_squared, ),
+#     r' seeing=%.2f" (arcsec) ' % (seeing_arcsec.value, ),
+#     r' read out rms=%.1f electrons/px ' % (read_rms.value, )))
 
-    canvas_size = (fig.get_dpi()*fig.get_size_inches()[0],fig.get_dpi()*fig.get_size_inches()[1])
-    layout = [[sg.Column(layout=[[sg.Canvas(key='fig_cv',size=canvas_size)]],background_color='#DAE0E6')],[sg.T(params_str)],
-    [sg.FolderBrowse(button_text='choose output folder',key='folder'),sg.InputText(default_text='file_name',key='name'),
-     sg.B('Save SNR plot as txt'),sg.B('Exit')]]
+#     canvas_size = (fig.get_dpi()*fig.get_size_inches()[0],fig.get_dpi()*fig.get_size_inches()[1])
+#     layout = [[sg.Column(layout=[[sg.Canvas(key='fig_cv',size=canvas_size)]],background_color='#DAE0E6')],[sg.T(params_str)],
+#     [sg.FolderBrowse(button_text='choose output folder',key='folder'),sg.InputText(default_text='file_name',key='name'),
+#      sg.B('Save SNR plot as txt'),sg.B('Exit')]]
 
-    window = sg.Window('Data', layout,finalize = True, resizable = True,element_justification='c')
-    window.move_to_center()
-    draw_figure(window['fig_cv'].TKCanvas, fig)
+#     window = sg.Window('Data', layout,finalize = True, resizable = True,element_justification='c')
+#     window.move_to_center()
+#     draw_figure(window['fig_cv'].TKCanvas, fig)
     
-    params_str = params_str + '\n left column: Column (px) , right column: SNR'
-    while True:
-        event, values = window.read()
-        if event in (sg.WIN_CLOSED, 'Exit'):  # always,  always give a way out!
-            break
-        if event == 'Save SNR plot as txt':
-            if os.path.exists(values['folder']) and len(values['name']) > 0:
-                for i,mag in enumerate(magnitudes):
-                    df = pd.DataFrame({'Column_(px)':field_arr_px,'SNR':SNR[i]})
-                    np.savetxt(os.path.normpath(os.path.join(values['folder'] , values['name'] + f'_G_mag{mag}')) +'.txt', df.values , header= params_str)
-                sg.popup_ok('Saved successfully')
-            else:
-                sg.popup_error('Invalid folder or name!')
+#     params_str = params_str + '\n left column: Column (px) , right column: SNR'
+#     while True:
+#         event, values = window.read()
+#         if event in (sg.WIN_CLOSED, 'Exit'):  # always,  always give a way out!
+#             break
+#         if event == 'Save SNR plot as txt':
+#             if os.path.exists(values['folder']) and len(values['name']) > 0:
+#                 for i,mag in enumerate(magnitudes):
+#                     df = pd.DataFrame({'Column_(px)':field_arr_px,'SNR':SNR[i]})
+#                     np.savetxt(os.path.normpath(os.path.join(values['folder'] , values['name'] + f'_G_mag{mag}')) +'.txt', df.values , header= params_str)
+#                 sg.popup_ok('Saved successfully')
+#             else:
+#                 sg.popup_error('Invalid folder or name!')
 
-    window.close()
+#     window.close()
 # In[33]:
 
 # Take user inputs, and turn them into an image
@@ -731,35 +731,35 @@ def simulate_image(params):
     return image
 
 # In[32]
-def main_window():
-    layout_main = [[sg.T('RA (deg)'),sg.InputText(default_text = 279.36 ,key='ra',size=(10,2)),
-            sg.T('DEC (deg)'),sg.InputText(default_text = 38.79, key='dec',size=(10,2)),
-            sg.T('Max G magnitude'),sg.InputText(default_text = 16 ,key='max_mag',size=(5,2)),
-            sg.T('Exposure (sec)'), sg.InputText(default_text = 1, key = 't_exp',size=(5,2)),sg.T('Seeing FWHM (arcsec)'),
-            sg.InputText(default_text = 1.5 ,key='seeing',size=(5,2))],[sg.T('Background (G-mag/arcsec**2)'),
-                sg.InputText(default_text = 20.5, key = 'bgd',size=(5,2)), sg.T('Read out RMS (e/px)'),
-                sg.InputText(default_text = 3.0 ,key='read_rms',size=(5,2)),sg.T('Temperature (C)'),sg.DropDown(values=list(dark['temp'].values),
-                default_value=dark['temp'][1],key='temp',size=(5,4)),sg.T('Resolution (binning)'),sg.DropDown(values=[1,2,3,4,5],default_value=1,key='resolution',size=(5,4))]
-                ,[sg.T('G-band magnitudes for SNR plot'),sg.Listbox(values = [10,11,12,13,14,15,16,17,18], default_values = [15,16],select_mode=sg.LISTBOX_SELECT_MODE_MULTIPLE,key='mag_lst',size=(10,3)),
-                sg.T('Mode of operation'),sg.DropDown(values=['Spectra','Image','Image_narrow'],default_value='Spectra',key='op_mode'),
-                sg.B(button_text='Simulate Image'),sg.B(button_text='Plot SNR vs. CCD column')]]
-    sg.set_options(font=("Arial", 13))
-    main_wind = sg.Window('Imaging parameters',layout_main,element_justification='c',finalize=True)
-    main_wind.move_to_center()
+# def main_window():
+#     layout_main = [[sg.T('RA (deg)'),sg.InputText(default_text = 279.36 ,key='ra',size=(10,2)),
+#             sg.T('DEC (deg)'),sg.InputText(default_text = 38.79, key='dec',size=(10,2)),
+#             sg.T('Max G magnitude'),sg.InputText(default_text = 16 ,key='max_mag',size=(5,2)),
+#             sg.T('Exposure (sec)'), sg.InputText(default_text = 1, key = 't_exp',size=(5,2)),sg.T('Seeing FWHM (arcsec)'),
+#             sg.InputText(default_text = 1.5 ,key='seeing',size=(5,2))],[sg.T('Background (G-mag/arcsec**2)'),
+#                 sg.InputText(default_text = 20.5, key = 'bgd',size=(5,2)), sg.T('Read out RMS (e/px)'),
+#                 sg.InputText(default_text = 3.0 ,key='read_rms',size=(5,2)),sg.T('Temperature (C)'),sg.DropDown(values=list(dark['temp'].values),
+#                 default_value=dark['temp'][1],key='temp',size=(5,4)),sg.T('Resolution (binning)'),sg.DropDown(values=[1,2,3,4,5],default_value=1,key='resolution',size=(5,4))]
+#                 ,[sg.T('G-band magnitudes for SNR plot'),sg.Listbox(values = [10,11,12,13,14,15,16,17,18], default_values = [15,16],select_mode=sg.LISTBOX_SELECT_MODE_MULTIPLE,key='mag_lst',size=(10,3)),
+#                 sg.T('Mode of operation'),sg.DropDown(values=['Spectra','Image','Image_narrow'],default_value='Spectra',key='op_mode'),
+#                 sg.B(button_text='Simulate Image'),sg.B(button_text='Plot SNR vs. CCD column')]]
+#     sg.set_options(font=("Arial", 13))
+#     main_wind = sg.Window('Imaging parameters',layout_main,element_justification='c',finalize=True)
+#     main_wind.move_to_center()
     
-    while True:
-        event,params = main_wind.read()
-        if event == sg.WIN_CLOSED:
-            break
-        elif event == 'Simulate Image':
-            image = simulate_image(params)
-            interactive_image_window(image,params)
-        elif event == 'Plot SNR vs. CCD column':
-            snr_window(np.array(params['mag_lst']),float(params['read_rms']) * u.electron,float(params['t_exp'])* u.s,
-                                float(params['seeing']) * u.arcsec, float(params['bgd']), int(params['temp']),params['op_mode'])
+#     while True:
+#         event,params = main_wind.read()
+#         if event == sg.WIN_CLOSED:
+#             break
+#         elif event == 'Simulate Image':
+#             image = simulate_image(params)
+#             interactive_image_window(image,params)
+#         elif event == 'Plot SNR vs. CCD column':
+#             snr_window(np.array(params['mag_lst']),float(params['read_rms']) * u.electron,float(params['t_exp'])* u.s,
+#                                 float(params['seeing']) * u.arcsec, float(params['bgd']), int(params['temp']),params['op_mode'])
 
-    main_wind.close()
+#     main_wind.close()
 
-if __name__=='__main__':
-    main_window()
+# if __name__=='__main__':
+#     main_window()
         
